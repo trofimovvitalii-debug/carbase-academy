@@ -92,3 +92,22 @@ export default function Home() {
                 <div style={{padding:'12px 15px',background:'#0a1628',border:'1px solid rgba(59,130,246,0.12)',borderRadius:'14px 14px 14px 3px',display:'flex',gap:'5px',alignItems:'center'}}>
                   {[0,1,2].map(i=><div key={i} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#3b82f6',animation:`blink 1.2s infinite ${i*0.2}s`}}/>)}
                 </div>
+</div>
+            )}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'6px',padding:'10px 16px',borderTop:'1px solid rgba(59,130,246,0.08)',background:'#060d1a'}}>
+            {chips.map((c,i)=>(
+              <button key={i} className="chip" onClick={()=>send(c)} style={{fontSize:'11px',padding:'5px 11px',border:'1px solid rgba(59,130,246,0.18)',borderRadius:'20px',background:'none',cursor:'pointer',color:'#4a7fd4',transition:'all 0.15s',fontFamily:'inherit'}}>
+                {c.length > 30 ? c.slice(0,30)+'…' : c}
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:'8px',padding:'12px 16px',borderTop:'1px solid rgba(59,130,246,0.08)',background:'#060d1a'}}>
+            <input className="inp" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()} placeholder="Опиши ситуацию с клиентом..." style={{flex:1,padding:'11px 16px',border:'1px solid rgba(59,130,246,0.2)',borderRadius:'24px',fontSize:'13px',background:'#0a1628',color:'#c8dcf8',fontFamily:'inherit'}}/>
+            <button onClick={()=>send()} disabled={loading} style={{width:'42px',height:'42px',borderRadius:'50%',background:'linear-gradient(135deg,#1e3a8a,#3b82f6)',border:'none',cursor:loading?'not-allowed':'pointer',color:'#fff',fontSize:'19px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 14px rgba(59,130,246,0.4)',opacity:loading?0.5:1,flexShrink:0}}>↑</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
