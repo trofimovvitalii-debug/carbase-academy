@@ -23,6 +23,12 @@ export default function Home() {
     }
     setLoading(false);
   }
+  function fmt(t){
+    return (t||'')
+      .replace(/\*\*(.*?)\*\*/g,'<strong style="color:#93c5fd">$1</strong>')
+      .replace(/### (.*?)(\n|$)/g,'<div style="color:#60a5fa;font-weight:700;margin:8px 0 4px">$1</div>')
+      .replace(/\n/g,'<br/>');
+  }
   return(
     <div style={{background:'#04080f',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'12px',fontFamily:'system-ui,sans-serif'}}>
       <style>{`@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}*{box-sizing:border-box;margin:0;padding:0}`}</style>
@@ -41,7 +47,7 @@ export default function Home() {
           {messages.map((m,i)=>(
             <div key={i} style={{display:'flex',flexDirection:'column',alignItems:m.role==='assistant'?'flex-start':'flex-end',gap:'4px'}}>
               {m.role==='assistant'&&<div style={{fontSize:'10px',color:'#1e4080',fontWeight:700,letterSpacing:'0.8px',textTransform:'uppercase',padding:'0 4px'}}>Ассистент</div>}
-              <div style={{padding:'12px 15px',borderRadius:m.role==='assistant'?'14px 14px 14px 3px':'14px 14px 3px 14px',fontSize:'13.5px',lineHeight:1.65,maxWidth:'92%',background:m.role==='assistant'?'#0a1628':'linear-gradient(135deg,#1e3a8a,#2563eb)',color:m.role==='assistant'?'#c8dcf8':'#fff',border:m.role==='assistant'?'1px solid rgba(59,130,246,0.12)':'none'}}>{m.content}</div>
+              <div style={{padding:'12px 15px',borderRadius:m.role==='assistant'?'14px 14px 14px 3px':'14px 14px 3px 14px',fontSize:'13.5px',lineHeight:1.65,maxWidth:'92%',background:m.role==='assistant'?'#0a1628':'linear-gradient(135deg,#1e3a8a,#2563eb)',color:m.role==='assistant'?'#c8dcf8':'#fff',border:m.role==='assistant'?'1px solid rgba(59,130,246,0.12)':'none'}} dangerouslySetInnerHTML={{__html:fmt(m.content)}}/>
             </div>
           ))}
           {loading&&<div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px'}}><div style={{fontSize:'10px',color:'#1e4080',fontWeight:700,letterSpacing:'0.8px',textTransform:'uppercase',padding:'0 4px'}}>Ассистент</div><div style={{padding:'12px 15px',background:'#0a1628',border:'1px solid rgba(59,130,246,0.12)',borderRadius:'14px 14px 14px 3px',display:'flex',gap:'5px'}}>{[0,1,2].map(i=><div key={i} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#3b82f6',animation:`blink 1.2s infinite ${i*0.2}s`}}/>)}</div></div>}
