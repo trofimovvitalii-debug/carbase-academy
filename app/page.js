@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 
 export default function Home() {
   const [screen, setScreen] = useState('home');
-  const [messages, setMessages] = useState([{role:'assistant',content:'Привет! Вставь сообщение клиента или задай вопрос — отвечу с аргументами и ценами 💪'}]);
+  const [messages, setMessages] = useState([{role:'assistant',content:'Привет! Я твой помощник по услугам, технологиям, ценам и технике продаж в CarBase. Задай вопрос или опиши ситуацию с клиентом 💪'}]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const msgsRef = useRef(null);
@@ -11,8 +11,6 @@ export default function Home() {
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [messages, loading]);
-
-  const chips = ['Клиент говорит дорого','Машина новая зачем керамика','Хочет уйти к конкурентам','Как выявить потребность'];
 
   async function send(text) {
     const q = text || input.trim();
@@ -34,7 +32,12 @@ export default function Home() {
   function fmt(t) {
     return (t||'')
       .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-      .replace(/### (.*?)(\n|$)/g,'<div style="font-weight:700;margin:8px 0 4px">$1</div>')
+      .replace(/### (.*?)(\n|$)/g,'<div style="font-weight:700;font-size:15px;margin:10px 0 6px;color:#1d1d1f">$1</div>')
+      .replace(/## (.*?)(\n|$)/g,'<div style="font-weight:700;margin:8px 0 4px;color:#1d1d1f">$1</div>')
+      .replace(/\| (.*?) \| (.*?) \|/g, (match, col1, col2) => {
+        if (col1.includes('---')) return '';
+        return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06)"><span style="color:#1d1d1f">${col1}</span><span style="font-weight:600;color:#0071e3;white-space:nowrap;margin-left:12px">${col2}</span></div>`;
+      })
       .replace(/\n/g,'<br/>');
   }
 
@@ -83,15 +86,11 @@ export default function Home() {
           <span>CarBase</span>
           <span style={{fontSize:13}}>📶 🔋</span>
         </div>
-
-        {/* Header */}
         <div style={{marginTop:20, marginBottom:20}}>
           <div style={{fontSize:13, color:'#86868b', fontWeight:500, marginBottom:4}}>Добрый день 👋</div>
           <div style={{fontSize:30, fontWeight:700, letterSpacing:'-0.5px', color:'#1d1d1f', marginBottom:2}}>Менеджер</div>
           <div style={{fontSize:13, color:'#86868b'}}>CarBase Academy</div>
         </div>
-
-        {/* Progress */}
         <div style={{...styles.glass, padding:'16px 18px', marginBottom:24}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
             <span style={{fontSize:13, fontWeight:600, color:'#86868b', textTransform:'uppercase', letterSpacing:'0.4px'}}>Аттестация</span>
@@ -102,12 +101,8 @@ export default function Home() {
           </div>
           <div style={{fontSize:12, color:'#86868b'}}>Пройди все блоки — откроется КП для клиентов</div>
         </div>
-
-        {/* Cards */}
         <div style={{fontSize:20, fontWeight:700, letterSpacing:'-0.3px', color:'#1d1d1f', marginBottom:12}}>Инструменты</div>
         <div style={{display:'flex', flexDirection:'column', gap:10}}>
-
-          {/* Chat */}
           <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => setScreen('chat')}>
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(0,113,227,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>💬</div>
             <div style={{flex:1}}>
@@ -119,8 +114,6 @@ export default function Home() {
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
-
-          {/* Attestation */}
           <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => setScreen('attestation')}>
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(255,149,0,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>🎓</div>
             <div style={{flex:1}}>
@@ -132,8 +125,6 @@ export default function Home() {
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
-
-          {/* Training */}
           <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => setScreen('training')}>
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(52,199,89,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>📚</div>
             <div style={{flex:1}}>
@@ -145,8 +136,6 @@ export default function Home() {
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
-
-          {/* KP - locked */}
           <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, opacity:0.45}}>
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(175,82,222,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>📄</div>
             <div style={{flex:1}}>
@@ -155,7 +144,6 @@ export default function Home() {
             </div>
             <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(0,0,0,0.06)', color:'#c7c7cc'}}>🔒</span>
           </div>
-
         </div>
       </div>
     </div>
@@ -173,8 +161,6 @@ export default function Home() {
           <div style={{fontSize:13, color:'#86868b'}}>Вставь вопрос клиента — получи ответ</div>
         </div>
       </div>
-
-      {/* Messages */}
       <div ref={msgsRef} style={{flex:1, overflowY:'auto', padding:'0 16px', display:'flex', flexDirection:'column', gap:12, position:'relative', zIndex:1}}>
         {messages.map((m,i) => (
           <div key={i} style={{display:'flex', flexDirection:'column', alignItems: m.role==='assistant' ? 'flex-start' : 'flex-end', gap:4}}>
@@ -201,17 +187,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* Chips */}
-      <div style={{display:'flex', flexWrap:'wrap', gap:6, padding:'10px 16px', position:'relative', zIndex:1}}>
-        {chips.map((c,i) => (
-          <button key={i} onClick={() => send(c)} style={{fontSize:12, padding:'6px 12px', border:'1px solid rgba(255,255,255,0.7)', borderRadius:20, background:'rgba(255,255,255,0.5)', backdropFilter:'blur(10px)', cursor:'pointer', color:'#0071e3', fontWeight:500}}>
-            {c}
-          </button>
-        ))}
-      </div>
-
-      {/* Input */}
       <div style={{padding:'8px 16px 32px', position:'relative', zIndex:1}}>
         <div style={{...styles.glass, display:'flex', alignItems:'flex-end', gap:8, padding:'10px 10px 10px 16px'}}>
           <textarea
