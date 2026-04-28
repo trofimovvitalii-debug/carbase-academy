@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase';
 export async function POST(request) {
   const { messages } = await request.json();
 
-  // Тянем тех. карты
   let knowledgeBlock = '';
   try {
     const { data, error } = await supabase
@@ -17,7 +16,6 @@ export async function POST(request) {
     console.error('knowledge_base error:', e);
   }
 
-  // Тянем прайс
   let priceBlock = '';
   try {
     const { data, error } = await supabase
@@ -25,18 +23,16 @@ export async function POST(request) {
       .select('service_group, service, cat01, cat02, cat03, cat04, cat05');
     if (!error && data && data.length > 0) {
       priceBlock = '\n\n--- АКТУАЛЬНЫЙ ПРАЙС ---\n' +
-        'Категории авто: Кат.01 (малый класс), Кат.02 (средний), Кат.03 (большой), Кат.04 (премиум), Кат.05 (люкс/внедорожник)\n\n' +
+        'Кат.01 (малый), Кат.02 (средний), Кат.03 (большой), Кат.04 (премиум), Кат.05 (люкс)\n\n' +
         data.map(item =>
-          `${item.service_group} / ${item.service}: Кат.01=${item.cat01}₽, Кат.02=${item.cat02}₽, Кат.03=${item.cat03}₽, Кат.04=${item.cat04}₽, Кат.05=${item.cat05}₽`
+          `${item.service_group} / ${item.service}: ${item.cat01}₽ / ${item.cat02}₽ / ${item.cat03}₽ / ${item.cat04}₽ / ${item.cat05}₽`
         ).join('\n');
     }
   } catch (e) {
     console.error('price_list error:', e);
   }
 
-  const SYSTEM = `Ты опытный эксперт по продажам и технологиям детейлинга. Работаешь в сети детейлинг центров CarBase. Помогай менеджерам прямо во время разговора с клиентом. Отвечай как умный коллега — конкретно, с реальными фразами, логически обоснованно. Максимум 6-8 предложений.
-
-Когда называешь цены — всегда уточняй категорию автомобиля если она не указана, или давай диапазон цен от минимальной до максимальной категории.` + knowledgeBlock + priceBlock;
+  const SYSTEM = `Ты опытный эксперт по продажам и технологиям детейлинга. Работаешь в сети детейлинг центров CarBase. Помогай менеджерам прямо во время разговора с клиентом. Отвечай как умный коллега — конкретно, с реальными фразами, логически обоснованно. Максимум 6-8 предложений. Когда называешь цены — всегда уточняй категорию автомобиля если она не указана, или давай диапазон цен от минимальной до максимальной категории.` + knowledgeBlock + priceBlock;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
