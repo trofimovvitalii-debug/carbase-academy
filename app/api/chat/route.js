@@ -8,6 +8,7 @@ export async function POST(request) {
     const { data, error } = await supabase
       .from('knowledge_base')
       .select('title, content');
+    console.log('knowledge_base:', data?.length, 'error:', error);
     if (!error && data && data.length > 0) {
       knowledgeBlock = '\n\n--- БАЗА ЗНАНИЙ (ТЕХ. КАРТЫ) ---\n' +
         data.map(item => `## ${item.title}\n${item.content}`).join('\n\n');
@@ -18,13 +19,14 @@ export async function POST(request) {
 
   let priceBlock = '';
   try {
-    const { data, error } = await supabase
+    const { data: priceData, error: priceError } = await supabase
       .from('price_list')
       .select('service_group, service, cat01, cat02, cat03, cat04, cat05');
-    if (!error && data && data.length > 0) {
+    console.log('price_list:', priceData?.length, 'error:', priceError);
+    if (!priceError && priceData && priceData.length > 0) {
       priceBlock = '\n\n--- АКТУАЛЬНЫЙ ПРАЙС ---\n' +
         'Кат.01 (малый), Кат.02 (средний), Кат.03 (большой), Кат.04 (премиум), Кат.05 (люкс)\n\n' +
-        data.map(item =>
+        priceData.map(item =>
           `${item.service_group} / ${item.service}: ${item.cat01}₽ / ${item.cat02}₽ / ${item.cat03}₽ / ${item.cat04}₽ / ${item.cat05}₽`
         ).join('\n');
     }
