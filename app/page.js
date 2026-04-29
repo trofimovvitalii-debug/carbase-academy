@@ -100,7 +100,7 @@ export default function Home() {
       setAttLoading(true);
       const res = await fetch('/api/attestation', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'evaluate', block:attBlock, answers:newAnswers})
+       body: JSON.stringify({action:'evaluate', block:attBlock, answers:newAnswers, user_id: user?.id})
       });
       const data = await res.json();
       setAttResult(data.evaluation);
