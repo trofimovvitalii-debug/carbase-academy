@@ -8,6 +8,16 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const msgsRef = useRef(null);
 
+  // Аттестация
+  const [attStage, setAttStage] = useState('blocks'); // blocks | question | result
+  const [attBlock, setAttBlock] = useState(null);
+  const [attQuestion, setAttQuestion] = useState('');
+  const [attQuestionNum, setAttQuestionNum] = useState(1);
+  const [attAnswers, setAttAnswers] = useState([]);
+  const [attCurrentAnswer, setAttCurrentAnswer] = useState('');
+  const [attLoading, setAttLoading] = useState(false);
+  const [attResult, setAttResult] = useState('');
+
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [messages, loading]);
@@ -27,6 +37,54 @@ export default function Home() {
       setMessages(p => [...p, {role:'assistant', content:'Ошибка соединения.'}]);
     }
     setLoading(false);
+  }
+
+  async function startAttestation(block) {
+    setAttBlock(block);
+    setAttAnswers([]);
+    setAttQuestionNum(1);
+    setAttCurrentAnswer('');
+    setAttResult('');
+    setAttStage('question');
+    setAttLoading(true);
+    const res = await fetch('/api/attestation', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'get_question', block, question_number:1, answers:[]})
+    });
+    const data = await res.json();
+    setAttQuestion(data.question);
+    setAttLoading(false);
+  }
+
+  async function submitAnswer() {
+    if (!attCurrentAnswer.trim()) return;
+    const newAnswers = [...attAnswers, {question: attQuestion, answer: attCurrentAnswer}];
+    setAttAnswers(newAnswers);
+    setAttCurrentAnswer('');
+
+    if (attQuestionNum < 10) {
+      const next = attQuestionNum + 1;
+      setAttQuestionNum(next);
+      setAttLoading(true);
+      const res = await fetch('/api/attestation', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:'get_question', block:attBlock, question_number:next, answers:newAnswers})
+      });
+      const data = await res.json();
+      setAttQuestion(data.question);
+      setAttLoading(false);
+    } else {
+      setAttStage('evaluating');
+      setAttLoading(true);
+      const res = await fetch('/api/attestation', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:'evaluate', block:attBlock, answers:newAnswers})
+      });
+      const data = await res.json();
+      setAttResult(data.evaluation);
+      setAttStage('result');
+      setAttLoading(false);
+    }
   }
 
   function fmt(t) {
@@ -77,6 +135,14 @@ export default function Home() {
     },
   };
 
+  const blocks = [
+    {id:'ppf', icon:'🛡️', name:'Антигравийная плёнка', meta:'10 вопросов · ~8 мин', color:'rgba(0,113,227,0.12)', active:true},
+    {id:'antidust', icon:'💧', name:'Антидождь', meta:'10 вопросов · ~8 мин', color:'rgba(255,149,0,0.12)', active:true},
+    {id:'polish', icon:'✨', name:'Полировка и керамика', meta:'10 вопросов · ~8 мин', color:'rgba(52,199,89,0.12)', active:true},
+    {id:'cleaning', icon:'🧹', name:'Химчистка', meta:'10 вопросов · ~8 мин', color:'rgba(175,82,222,0.12)', active:true},
+    {id:'sales', icon:'🗣️', name:'Техника продаж', meta:'Скоро — загружаем материалы', color:'rgba(255,59,48,0.12)', active:false},
+  ];
+
   // ── HOME ──
   if (screen === 'home') return (
     <div style={styles.app}>
@@ -94,7 +160,7 @@ export default function Home() {
         <div style={{...styles.glass, padding:'16px 18px', marginBottom:24}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
             <span style={{fontSize:13, fontWeight:600, color:'#86868b', textTransform:'uppercase', letterSpacing:'0.4px'}}>Аттестация</span>
-            <span style={{fontSize:13, fontWeight:600, color:'#0071e3'}}>0 из 3</span>
+            <span style={{fontSize:13, fontWeight:600, color:'#0071e3'}}>0 из 4</span>
           </div>
           <div style={{background:'rgba(0,0,0,0.08)', borderRadius:4, height:6, marginBottom:8}}>
             <div style={{background:'linear-gradient(90deg,#0071e3,#af52de)', height:6, borderRadius:4, width:'0%'}} />
@@ -114,14 +180,14 @@ export default function Home() {
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
-          <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => setScreen('attestation')}>
+          <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => { setAttStage('blocks'); setScreen('attestation'); }}>
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(255,149,0,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>🎓</div>
             <div style={{flex:1}}>
               <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f', marginBottom:3}}>Аттестация</div>
-              <div style={{fontSize:13, color:'#86868b'}}>PPF · Антидождь · Продажи</div>
+              <div style={{fontSize:13, color:'#86868b'}}>PPF · Антидождь · Полировка · Химчистка</div>
             </div>
             <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6}}>
-              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>0/3</span>
+              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>0/4</span>
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
@@ -132,7 +198,7 @@ export default function Home() {
               <div style={{fontSize:13, color:'#86868b'}}>Тех. карты и скрипты</div>
             </div>
             <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6}}>
-              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(0,113,227,0.1)', color:'#0071e3'}}>2 темы</span>
+              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(0,113,227,0.1)', color:'#0071e3'}}>5 тем</span>
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
@@ -210,32 +276,100 @@ export default function Home() {
       <div style={styles.blob} />
       <div style={{position:'relative', zIndex:1, padding:'0 20px 40px'}}>
         <div style={styles.statusBar}><span>CarBase</span><span style={{fontSize:13}}>📶 🔋</span></div>
-        <div style={styles.backBtn} onClick={() => setScreen('home')}>‹ Главная</div>
-        <div style={{padding:'12px 0 20px'}}>
-          <div style={{fontSize:22, fontWeight:700, color:'#1d1d1f', marginBottom:4}}>Аттестация</div>
-          <div style={{fontSize:13, color:'#86868b'}}>Выберите блок для прохождения</div>
+        <div style={styles.backBtn} onClick={() => { attStage === 'blocks' ? setScreen('home') : setAttStage('blocks'); }}>
+          ‹ {attStage === 'blocks' ? 'Главная' : 'Блоки'}
         </div>
-        <div style={{display:'flex', flexDirection:'column', gap:10}}>
-          {[
-            {icon:'🛡️', name:'Антигравийная плёнка', meta:'10 вопросов · ~8 мин', color:'rgba(0,113,227,0.12)', status:'Начать', statusColor:'#ff9500', statusBg:'rgba(255,149,0,0.12)'},
-            {icon:'💧', name:'Антидождь', meta:'10 вопросов · ~8 мин', color:'rgba(255,149,0,0.12)', status:'Начать', statusColor:'#ff9500', statusBg:'rgba(255,149,0,0.12)'},
-            {icon:'🗣️', name:'Техника продаж', meta:'Скоро — загружаем материалы', color:'rgba(175,82,222,0.12)', status:'Скоро', statusColor:'#c7c7cc', statusBg:'rgba(0,0,0,0.06)'},
-          ].map((b,i) => (
-            <div key={i} style={{...styles.glass, padding:18}}>
-              <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:10}}>
-                <div style={{width:44, height:44, borderRadius:12, background:b.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0}}>{b.icon}</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f'}}>{b.name}</div>
-                  <div style={{fontSize:13, color:'#86868b', marginTop:2}}>{b.meta}</div>
-                </div>
-                <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:b.statusBg, color:b.statusColor}}>{b.status}</span>
-              </div>
-              <div style={{background:'rgba(0,0,0,0.07)', borderRadius:3, height:4}}>
-                <div style={{height:4, borderRadius:3, background:'#34c759', width:'0%'}} />
-              </div>
+
+        {/* ВЫБОР БЛОКА */}
+        {attStage === 'blocks' && (
+          <>
+            <div style={{padding:'12px 0 20px'}}>
+              <div style={{fontSize:22, fontWeight:700, color:'#1d1d1f', marginBottom:4}}>Аттестация</div>
+              <div style={{fontSize:13, color:'#86868b'}}>Выберите блок для прохождения</div>
             </div>
-          ))}
-        </div>
+            <div style={{display:'flex', flexDirection:'column', gap:10}}>
+              {blocks.map((b) => (
+                <div key={b.id} style={{...styles.glass, padding:18, opacity: b.active ? 1 : 0.5, cursor: b.active ? 'pointer' : 'default'}}
+                  onClick={() => b.active && startAttestation(b.id)}>
+                  <div style={{display:'flex', alignItems:'center', gap:12}}>
+                    <div style={{width:44, height:44, borderRadius:12, background:b.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0}}>{b.icon}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f'}}>{b.name}</div>
+                      <div style={{fontSize:13, color:'#86868b', marginTop:2}}>{b.meta}</div>
+                    </div>
+                    {b.active && <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>Начать</span>}
+                    {!b.active && <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(0,0,0,0.06)', color:'#c7c7cc'}}>Скоро</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ВОПРОС */}
+        {attStage === 'question' && (
+          <>
+            <div style={{padding:'12px 0 16px'}}>
+              <div style={{fontSize:22, fontWeight:700, color:'#1d1d1f', marginBottom:4}}>
+                {blocks.find(b => b.id === attBlock)?.name}
+              </div>
+              <div style={{fontSize:13, color:'#86868b'}}>Вопрос {attQuestionNum} из 10</div>
+            </div>
+            <div style={{background:'rgba(0,0,0,0.08)', borderRadius:4, height:6, marginBottom:20}}>
+              <div style={{background:'linear-gradient(90deg,#0071e3,#af52de)', height:6, borderRadius:4, width:`${(attQuestionNum-1)*10}%`, transition:'width 0.3s'}} />
+            </div>
+            {attLoading ? (
+              <div style={{...styles.glass, padding:24, textAlign:'center', color:'#86868b', fontSize:14}}>
+                Загружаем вопрос...
+              </div>
+            ) : (
+              <>
+                <div style={{...styles.glass, padding:20, marginBottom:16}}>
+                  <div style={{fontSize:11, fontWeight:600, color:'#0071e3', textTransform:'uppercase', letterSpacing:'1px', marginBottom:10}}>Вопрос {attQuestionNum}</div>
+                  <div style={{fontSize:17, fontWeight:600, color:'#1d1d1f', lineHeight:1.5}}>{attQuestion}</div>
+                </div>
+                <textarea
+                  value={attCurrentAnswer}
+                  onChange={e => setAttCurrentAnswer(e.target.value)}
+                  placeholder="Ваш ответ..."
+                  rows={5}
+                  style={{width:'100%', background:'rgba(255,255,255,0.62)', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.78)', borderRadius:18, padding:16, fontSize:15, fontFamily:'inherit', color:'#1d1d1f', resize:'none', outline:'none', marginBottom:16, boxSizing:'border-box'}}
+                />
+                <button onClick={submitAnswer} disabled={!attCurrentAnswer.trim()} style={{width:'100%', padding:'16px', background: attCurrentAnswer.trim() ? '#0071e3' : '#c7c7cc', color:'white', border:'none', borderRadius:14, fontSize:16, fontWeight:600, fontFamily:'inherit', cursor: attCurrentAnswer.trim() ? 'pointer' : 'default'}}>
+                  {attQuestionNum < 10 ? 'Следующий вопрос →' : 'Завершить и получить оценку'}
+                </button>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ОЦЕНКА */}
+        {attStage === 'evaluating' && (
+          <div style={{padding:'40px 0', textAlign:'center'}}>
+            <div style={{fontSize:40, marginBottom:16}}>⏳</div>
+            <div style={{fontSize:18, fontWeight:600, color:'#1d1d1f', marginBottom:8}}>Анализируем ваши ответы</div>
+            <div style={{fontSize:14, color:'#86868b'}}>AI оценивает знания — подождите немного...</div>
+          </div>
+        )}
+
+        {/* РЕЗУЛЬТАТ */}
+        {attStage === 'result' && (
+          <>
+            <div style={{padding:'12px 0 20px'}}>
+              <div style={{fontSize:22, fontWeight:700, color:'#1d1d1f', marginBottom:4}}>Результат</div>
+              <div style={{fontSize:13, color:'#86868b'}}>{blocks.find(b => b.id === attBlock)?.name}</div>
+            </div>
+            <div style={{...styles.glass, padding:20, marginBottom:16, fontSize:14, lineHeight:1.7, color:'#1d1d1f', whiteSpace:'pre-wrap'}}>
+              {attResult}
+            </div>
+            <button onClick={() => setAttStage('blocks')} style={{width:'100%', padding:'16px', background:'#0071e3', color:'white', border:'none', borderRadius:14, fontSize:16, fontWeight:600, fontFamily:'inherit', cursor:'pointer', marginBottom:10}}>
+              Пройти другой блок
+            </button>
+            <button onClick={() => startAttestation(attBlock)} style={{width:'100%', padding:'16px', background:'rgba(255,255,255,0.62)', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.78)', borderRadius:14, fontSize:16, fontWeight:600, fontFamily:'inherit', cursor:'pointer', color:'#0071e3'}}>
+              Пройти этот блок заново
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -255,8 +389,10 @@ export default function Home() {
           {[
             {icon:'🛡️', name:'Антигравийная плёнка', desc:'Виды, стоимость, этапы оклейки', color:'rgba(0,113,227,0.12)', active:true},
             {icon:'💧', name:'Антидождь', desc:'Составы, нанесение, цены', color:'rgba(255,149,0,0.12)', active:true},
-            {icon:'🗣️', name:'Техника продаж', desc:'Скоро — загружаем видео', color:'rgba(175,82,222,0.12)', active:false},
-            {icon:'✨', name:'Полировка', desc:'Скоро', color:'rgba(52,199,89,0.12)', active:false},
+            {icon:'✨', name:'Полировка и керамика', desc:'Технология, виды, аргументы', color:'rgba(52,199,89,0.12)', active:true},
+            {icon:'🧹', name:'Химчистка', desc:'Технология, допродажи, ошибки', color:'rgba(175,82,222,0.12)', active:true},
+            {icon:'🗣️', name:'Техника продаж', desc:'Скрипты, возражения, допродажи', color:'rgba(255,59,48,0.12)', active:true},
+            {icon:'🎬', name:'Видео-материалы', desc:'Скоро — загружаем видео', color:'rgba(255,149,0,0.12)', active:false},
           ].map((t,i) => (
             <div key={i} style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, opacity: t.active ? 1 : 0.5, cursor: t.active ? 'pointer' : 'default'}}>
               <div style={{width:46, height:46, borderRadius:13, background:t.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0}}>{t.icon}</div>
