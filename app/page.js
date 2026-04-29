@@ -1,4 +1,5 @@
 'use client';
+import { supabase } from '@/lib/supabase';
 import { useState, useRef, useEffect } from 'react';
 
 export default function Home() {
