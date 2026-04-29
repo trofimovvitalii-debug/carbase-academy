@@ -6,46 +6,10 @@ export default function Home() {
   const [screen, setScreen] = useState('home');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-
-  useEffect(() => {
-    async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = '/login';
-        return;
-      }
-      // Проверяем статус
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('status, role, name')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!profile || profile.status === 'pending') {
-        window.location.href = '/pending';
-        return;
-      }
-      if (profile.status !== 'active') {
-        window.location.href = '/login';
-        return;
-      }
-      setUser({ ...session.user, ...profile });
-      setAuthLoading(false);
-    }
-    checkAuth();
-  }, []);
-
-  if (authLoading) return (
-    <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #dff0ff 0%, #f0f0ff 45%, #ffe8f8 100%)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-      <div style={{fontSize:14, color:'#86868b'}}>Загрузка...</div>
-    </div>
-  );
   const [messages, setMessages] = useState([{role:'assistant',content:'Привет! Я твой помощник по услугам, технологиям, ценам и технике продаж в CarBase. Задай вопрос или опиши ситуацию с клиентом 💪'}]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const msgsRef = useRef(null);
-
-  // Аттестация
   const [attStage, setAttStage] = useState('blocks');
   const [attBlock, setAttBlock] = useState(null);
   const [attQuestion, setAttQuestion] = useState('');
@@ -54,11 +18,26 @@ export default function Home() {
   const [attCurrentAnswer, setAttCurrentAnswer] = useState('');
   const [attLoading, setAttLoading] = useState(false);
   const [attResult, setAttResult] = useState('');
-
-  // Обучение
   const [trainingTopic, setTrainingTopic] = useState(null);
   const [trainingContent, setTrainingContent] = useState('');
   const [trainingLoading, setTrainingLoading] = useState(false);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = '/login'; return; }
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('status, role, name, position')
+        .eq('id', session.user.id)
+        .single();
+      if (!profile || profile.status === 'pending') { window.location.href = '/pending'; return; }
+      if (profile.status !== 'active') { window.location.href = '/login'; return; }
+      setUser({ ...session.user, ...profile });
+      setAuthLoading(false);
+    }
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
@@ -197,7 +176,7 @@ export default function Home() {
     },
   };
 
-const blocks = [
+  const blocks = [
     {id:'ppf', icon:'🛡️', name:'Антигравийная плёнка', meta:'10 вопросов · ~8 мин', color:'rgba(0,113,227,0.12)', active:true},
     {id:'antidust', icon:'💧', name:'Антидождь', meta:'10 вопросов · ~8 мин', color:'rgba(255,149,0,0.12)', active:true},
     {id:'polish', icon:'✨', name:'Полировка кузова и керамика', meta:'10 вопросов · ~8 мин', color:'rgba(52,199,89,0.12)', active:true},
@@ -215,6 +194,12 @@ const blocks = [
     {icon:'🎬', name:'Видео-материалы', desc:'Скоро — загружаем видео', color:'rgba(255,149,0,0.12)', active:false},
   ];
 
+  if (authLoading) return (
+    <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #dff0ff 0%, #f0f0ff 45%, #ffe8f8 100%)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+      <div style={{fontSize:14, color:'#86868b'}}>Загрузка...</div>
+    </div>
+  );
+
   // ── HOME ──
   if (screen === 'home') return (
     <div style={styles.app}>
@@ -226,13 +211,13 @@ const blocks = [
         </div>
         <div style={{marginTop:20, marginBottom:20}}>
           <div style={{fontSize:13, color:'#86868b', fontWeight:500, marginBottom:4}}>Добрый день 👋</div>
-          <div style={{fontSize:30, fontWeight:700, letterSpacing:'-0.5px', color:'#1d1d1f', marginBottom:2}}>Менеджер</div>
-          <div style={{fontSize:13, color:'#86868b'}}>CarBase Academy</div>
+          <div style={{fontSize:30, fontWeight:700, letterSpacing:'-0.5px', color:'#1d1d1f', marginBottom:2}}>{user?.name || 'Менеджер'}</div>
+          <div style={{fontSize:13, color:'#86868b'}}>{user?.position || 'CarBase Academy'}</div>
         </div>
         <div style={{...styles.glass, padding:'16px 18px', marginBottom:24}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
             <span style={{fontSize:13, fontWeight:600, color:'#86868b', textTransform:'uppercase', letterSpacing:'0.4px'}}>Аттестация</span>
-            <span style={{fontSize:13, fontWeight:600, color:'#0071e3'}}>0 из 4</span>
+            <span style={{fontSize:13, fontWeight:600, color:'#0071e3'}}>0 из 5</span>
           </div>
           <div style={{background:'rgba(0,0,0,0.08)', borderRadius:4, height:6, marginBottom:8}}>
             <div style={{background:'linear-gradient(90deg,#0071e3,#af52de)', height:6, borderRadius:4, width:'0%'}} />
@@ -256,10 +241,10 @@ const blocks = [
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(255,149,0,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>🎓</div>
             <div style={{flex:1}}>
               <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f', marginBottom:3}}>Аттестация</div>
-              <div style={{fontSize:13, color:'#86868b'}}>PPF · Антидождь · Полировка · Химчистка</div>
+              <div style={{fontSize:13, color:'#86868b'}}>PPF · Антидождь · Полировка · Химчистка · Прайс</div>
             </div>
             <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6}}>
-              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>0/4</span>
+              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>0/5</span>
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
@@ -282,7 +267,21 @@ const blocks = [
             </div>
             <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(0,0,0,0.06)', color:'#c7c7cc'}}>🔒</span>
           </div>
+          {user?.role === 'admin' && (
+            <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => window.location.href = '/admin'}>
+              <div style={{width:50, height:50, borderRadius:14, background:'rgba(255,59,48,0.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>⚙️</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f', marginBottom:3}}>Панель админа</div>
+                <div style={{fontSize:13, color:'#86868b'}}>Управление пользователями</div>
+              </div>
+              <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
+            </div>
+          )}
         </div>
+        <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login'; }}
+          style={{width:'100%', padding:'14px', background:'rgba(0,0,0,0.04)', color:'#86868b', border:'none', borderRadius:14, fontSize:14, fontWeight:500, fontFamily:'inherit', cursor:'pointer', marginTop:20}}>
+          Выйти
+        </button>
       </div>
     </div>
   );
@@ -456,7 +455,7 @@ const blocks = [
     </div>
   );
 
-  // ── TOPIC (просмотр тех. карты) ──
+  // ── TOPIC ──
   if (screen === 'topic') return (
     <div style={{...styles.app, minHeight:'100vh'}}>
       <div style={styles.blob} />
