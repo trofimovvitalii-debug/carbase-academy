@@ -1,12 +1,11 @@
 import { supabase } from '@/lib/supabase';
 
 export async function POST(request) {
-  const { action, block, answers, question_number } = await request.json();
+  const { action, block, answers, question_number, user_id } = await request.json();
 
   let knowledge = '';
 
   if (block === 'price') {
-    // Для прайса тянем из price_list
     const { data: priceData, error: priceError } = await supabase
       .from('price_list')
       .select('service_group, service, cat01, cat02, cat03, cat04, cat05');
@@ -20,7 +19,6 @@ export async function POST(request) {
         `${item.service_group} / ${item.service}: Кат.01=${item.cat01}₽, Кат.02=${item.cat02}₽, Кат.03=${item.cat03}₽, Кат.04=${item.cat04}₽, Кат.05=${item.cat05}₽`
       ).join('\n');
   } else {
-    // Для остальных блоков тянем из knowledge_base
     const { data, error } = await supabase
       .from('knowledge_base')
       .select('title, content')
@@ -93,6 +91,24 @@ export async function POST(request) {
       })
     });
     const result = await response.json();
-    return Response.json({ evaluation: result.content[0].text });
+    const evaluation = result.content[0].text;
+
+    // Извлекаем балл из текста
+    const scoreMatch = evaluation.match(/ОБЩИЙ БАЛЛ:\s*(\d+)/);
+    const score = scoreMatch ? scoreMatch[1] : '?';
+
+    // Сохраняем результат если есть user_id
+    if (user_id) {
+      await supabase
+        .from('attestation_results')
+        .insert({
+          user_id,
+          block,
+          score: `${score}/10`,
+          details: evaluation,
+        });
+    }
+
+    return Response.json({ evaluation });
   }
 }
