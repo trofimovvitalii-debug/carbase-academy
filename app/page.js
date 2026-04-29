@@ -24,17 +24,19 @@ export default function Home() {
 
   useEffect(() => {
     async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { window.location.href = '/login'; return; }
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('status, role, name, position')
-        .eq('id', session.user.id)
-        .single();
-      if (!profile || profile.status === 'pending') { window.location.href = '/pending'; return; }
-      if (profile.status !== 'active') { window.location.href = '/login'; return; }
-      setUser({ ...session.user, ...profile });
-      setAuthLoading(false);
+  const { data: { session } } = await supabase.auth.getSession();
+  console.log('session:', session);
+  if (!session) { window.location.href = '/login'; return; }
+  const { data: profile, error } = await supabase
+    .from('user_profiles')
+    .select('status, role, name, position')
+    .eq('id', session.user.id)
+    .single();
+  console.log('profile:', profile, 'error:', error);
+  if (!profile || profile.status === 'pending') { window.location.href = '/pending'; return; }
+  if (profile.status !== 'active') { window.location.href = '/login'; return; }
+  setUser({ ...session.user, ...profile });
+  setAuthLoading(false);
     }
     checkAuth();
   }, []);
