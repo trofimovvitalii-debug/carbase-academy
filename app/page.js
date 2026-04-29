@@ -18,28 +18,59 @@ export default function Home() {
   const [attCurrentAnswer, setAttCurrentAnswer] = useState('');
   const [attLoading, setAttLoading] = useState(false);
   const [attResult, setAttResult] = useState('');
+  const [attResults, setAttResults] = useState({}); // сохранённые результаты по блокам
+  const [attProgress, setAttProgress] = useState({}); // прогресс по блокам
   const [trainingTopic, setTrainingTopic] = useState(null);
   const [trainingContent, setTrainingContent] = useState('');
   const [trainingLoading, setTrainingLoading] = useState(false);
 
   useEffect(() => {
     async function checkAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-  console.log('session:', session);
-  if (!session) { window.location.href = '/login'; return; }
-  const { data: profile, error } = await supabase
-    .from('user_profiles')
-    .select('status, role, name, position')
-    .eq('id', session.user.id)
-    .single();
-  console.log('profile:', profile, 'error:', error);
-  if (!profile || profile.status === 'pending') { window.location.href = '/pending'; return; }
-  if (profile.status !== 'active') { window.location.href = '/login'; return; }
-  setUser({ ...session.user, ...profile });
-  setAuthLoading(false);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = '/login'; return; }
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('status, role, name, position')
+        .eq('id', session.user.id)
+        .single();
+      if (!profile || profile.status === 'pending') { window.location.href = '/pending'; return; }
+      if (profile.status !== 'active') { window.location.href = '/login'; return; }
+      const userData = { ...session.user, ...profile };
+      setUser(userData);
+      setAuthLoading(false);
+      loadAttestationData(session.user.id);
     }
     checkAuth();
   }, []);
+
+  async function loadAttestationData(userId) {
+    // Загружаем результаты
+    const { data: results } = await supabase
+      .from('attestation_results')
+      .select('block, score, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (results) {
+      const resultsMap = {};
+      results.forEach(r => {
+        if (!resultsMap[r.block]) resultsMap[r.block] = r;
+      });
+      setAttResults(resultsMap);
+    }
+
+    // Загружаем прогресс
+    const { data: progress } = await supabase
+      .from('attestation_progress')
+      .select('block, question_number, answers')
+      .eq('user_id', userId);
+
+    if (progress) {
+      const progressMap = {};
+      progress.forEach(p => { progressMap[p.block] = p; });
+      setAttProgress(progressMap);
+    }
+  }
 
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
@@ -62,17 +93,34 @@ export default function Home() {
     setLoading(false);
   }
 
-  async function startAttestation(block) {
+  async function startAttestation(block, resume = false) {
     setAttBlock(block);
-    setAttAnswers([]);
-    setAttQuestionNum(1);
     setAttCurrentAnswer('');
     setAttResult('');
     setAttStage('question');
     setAttLoading(true);
+
+    let startNum = 1;
+    let startAnswers = [];
+
+    // Если есть прогресс и resume = true
+    if (resume && attProgress[block]) {
+      startNum = attProgress[block].question_number;
+      startAnswers = attProgress[block].answers || [];
+    } else {
+      // Удаляем старый прогресс
+      if (user?.id) {
+        await supabase.from('attestation_progress').delete()
+          .eq('user_id', user.id).eq('block', block);
+      }
+    }
+
+    setAttAnswers(startAnswers);
+    setAttQuestionNum(startNum);
+
     const res = await fetch('/api/attestation', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'get_question', block, question_number:1, answers:[]})
+      body: JSON.stringify({action:'get_question', block, question_number: startNum, answers: startAnswers})
     });
     const data = await res.json();
     setAttQuestion(data.question);
@@ -84,10 +132,21 @@ export default function Home() {
     const newAnswers = [...attAnswers, {question: attQuestion, answer: attCurrentAnswer}];
     setAttAnswers(newAnswers);
     setAttCurrentAnswer('');
+
     if (attQuestionNum < 10) {
       const next = attQuestionNum + 1;
       setAttQuestionNum(next);
       setAttLoading(true);
+
+      // Сохраняем прогресс
+      if (user?.id) {
+        await supabase.from('attestation_progress').upsert({
+          user_id: user.id, block: attBlock,
+          question_number: next, answers: newAnswers,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,block' });
+      }
+
       const res = await fetch('/api/attestation', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({action:'get_question', block:attBlock, question_number:next, answers:newAnswers})
@@ -100,12 +159,20 @@ export default function Home() {
       setAttLoading(true);
       const res = await fetch('/api/attestation', {
         method:'POST', headers:{'Content-Type':'application/json'},
-       body: JSON.stringify({action:'evaluate', block:attBlock, answers:newAnswers, user_id: user?.id})
+        body: JSON.stringify({action:'evaluate', block:attBlock, answers:newAnswers, user_id: user?.id})
       });
       const data = await res.json();
       setAttResult(data.evaluation);
       setAttStage('result');
       setAttLoading(false);
+
+      // Удаляем прогресс после завершения
+      if (user?.id) {
+        await supabase.from('attestation_progress').delete()
+          .eq('user_id', user.id).eq('block', attBlock);
+        // Обновляем данные
+        loadAttestationData(user.id);
+      }
     }
   }
 
@@ -196,6 +263,9 @@ export default function Home() {
     {icon:'🎬', name:'Видео-материалы', desc:'Скоро — загружаем видео', color:'rgba(255,149,0,0.12)', active:false},
   ];
 
+  const completedBlocks = blocks.filter(b => attResults[b.id]).length;
+  const totalActive = blocks.filter(b => b.active).length;
+
   if (authLoading) return (
     <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #dff0ff 0%, #f0f0ff 45%, #ffe8f8 100%)', display:'flex', alignItems:'center', justifyContent:'center'}}>
       <div style={{fontSize:14, color:'#86868b'}}>Загрузка...</div>
@@ -219,12 +289,14 @@ export default function Home() {
         <div style={{...styles.glass, padding:'16px 18px', marginBottom:24}}>
           <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
             <span style={{fontSize:13, fontWeight:600, color:'#86868b', textTransform:'uppercase', letterSpacing:'0.4px'}}>Аттестация</span>
-            <span style={{fontSize:13, fontWeight:600, color:'#0071e3'}}>0 из 5</span>
+            <span style={{fontSize:13, fontWeight:600, color:'#0071e3'}}>{completedBlocks} из {totalActive}</span>
           </div>
           <div style={{background:'rgba(0,0,0,0.08)', borderRadius:4, height:6, marginBottom:8}}>
-            <div style={{background:'linear-gradient(90deg,#0071e3,#af52de)', height:6, borderRadius:4, width:'0%'}} />
+            <div style={{background:'linear-gradient(90deg,#0071e3,#af52de)', height:6, borderRadius:4, width:`${totalActive > 0 ? (completedBlocks/totalActive)*100 : 0}%`, transition:'width 0.4s'}} />
           </div>
-          <div style={{fontSize:12, color:'#86868b'}}>Пройди все блоки — откроется КП для клиентов</div>
+          <div style={{fontSize:12, color:'#86868b'}}>
+            {completedBlocks === totalActive ? '🎉 Все блоки пройдены!' : 'Пройди все блоки — откроется КП для клиентов'}
+          </div>
         </div>
         <div style={{fontSize:20, fontWeight:700, letterSpacing:'-0.3px', color:'#1d1d1f', marginBottom:12}}>Инструменты</div>
         <div style={{display:'flex', flexDirection:'column', gap:10}}>
@@ -246,7 +318,7 @@ export default function Home() {
               <div style={{fontSize:13, color:'#86868b'}}>PPF · Антидождь · Полировка · Химчистка · Прайс</div>
             </div>
             <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6}}>
-              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>0/5</span>
+              <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>{completedBlocks}/{totalActive}</span>
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
@@ -261,13 +333,15 @@ export default function Home() {
               <span style={{color:'#c7c7cc', fontSize:18}}>›</span>
             </div>
           </div>
-          <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, opacity:0.45}}>
+          <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, opacity: completedBlocks === totalActive ? 1 : 0.45, cursor: completedBlocks === totalActive ? 'pointer' : 'default'}}>
             <div style={{width:50, height:50, borderRadius:14, background:'rgba(175,82,222,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0}}>📄</div>
             <div style={{flex:1}}>
               <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f', marginBottom:3}}>КП для клиента</div>
-              <div style={{fontSize:13, color:'#86868b'}}>Пройди аттестацию</div>
+              <div style={{fontSize:13, color:'#86868b'}}>{completedBlocks === totalActive ? 'Доступно!' : 'Пройди аттестацию'}</div>
             </div>
-            <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background:'rgba(0,0,0,0.06)', color:'#c7c7cc'}}>🔒</span>
+            <span style={{fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:7, background: completedBlocks === totalActive ? 'rgba(52,199,89,0.12)' : 'rgba(0,0,0,0.06)', color: completedBlocks === totalActive ? '#34c759' : '#c7c7cc'}}>
+              {completedBlocks === totalActive ? '✓' : '🔒'}
+            </span>
           </div>
           {user?.role === 'admin' && (
             <div style={{...styles.glass, padding:'16px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer'}} onClick={() => window.location.href = '/admin'}>
@@ -328,14 +402,10 @@ export default function Home() {
       </div>
       <div style={{padding:'8px 16px 32px', position:'relative', zIndex:1}}>
         <div style={{...styles.glass, display:'flex', alignItems:'flex-end', gap:8, padding:'10px 10px 10px 16px'}}>
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
+          <textarea value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key==='Enter' && !e.shiftKey && (e.preventDefault(), send())}
-            placeholder="Вопрос клиента или свой..."
-            rows={1}
-            style={{flex:1, background:'none', border:'none', outline:'none', fontFamily:'inherit', fontSize:15, color:'#1d1d1f', resize:'none', maxHeight:100, lineHeight:1.4}}
-          />
+            placeholder="Вопрос клиента или свой..." rows={1}
+            style={{flex:1, background:'none', border:'none', outline:'none', fontFamily:'inherit', fontSize:15, color:'#1d1d1f', resize:'none', maxHeight:100, lineHeight:1.4}} />
           <button onClick={() => send()} disabled={loading} style={{width:36, height:36, borderRadius:'50%', background:'#0071e3', border:'none', cursor:'pointer', color:'white', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>↑</button>
         </div>
       </div>
@@ -359,20 +429,46 @@ export default function Home() {
               <div style={{fontSize:13, color:'#86868b'}}>Выберите блок для прохождения</div>
             </div>
             <div style={{display:'flex', flexDirection:'column', gap:10}}>
-              {blocks.map((b) => (
-                <div key={b.id} style={{...styles.glass, padding:18, opacity: b.active ? 1 : 0.5, cursor: b.active ? 'pointer' : 'default'}}
-                  onClick={() => b.active && startAttestation(b.id)}>
-                  <div style={{display:'flex', alignItems:'center', gap:12}}>
-                    <div style={{width:44, height:44, borderRadius:12, background:b.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0}}>{b.icon}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f'}}>{b.name}</div>
-                      <div style={{fontSize:13, color:'#86868b', marginTop:2}}>{b.meta}</div>
+              {blocks.map((b) => {
+                const result = attResults[b.id];
+                const progress = attProgress[b.id];
+                return (
+                  <div key={b.id} style={{...styles.glass, padding:18, opacity: b.active ? 1 : 0.5, cursor: b.active ? 'pointer' : 'default'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:12, marginBottom: (result || progress) ? 10 : 0}}
+                      onClick={() => b.active && !progress && startAttestation(b.id)}>
+                      <div style={{width:44, height:44, borderRadius:12, background:b.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0}}>{b.icon}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:16, fontWeight:600, color:'#1d1d1f'}}>{b.name}</div>
+                        <div style={{fontSize:13, color:'#86868b', marginTop:2}}>
+                          {result ? `Последний результат: ${result.score}` : b.meta}
+                        </div>
+                      </div>
+                      {result ? <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(52,199,89,0.12)', color:'#34c759'}}>✓ {result.score}</span>
+                      : progress ? <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(0,113,227,0.12)', color:'#0071e3'}}>{progress.question_number-1}/10</span>
+                      : b.active ? <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>Начать</span>
+                      : <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(0,0,0,0.06)', color:'#c7c7cc'}}>Скоро</span>}
                     </div>
-                    {b.active ? <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(255,149,0,0.12)', color:'#ff9500'}}>Начать</span>
-                    : <span style={{fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:'rgba(0,0,0,0.06)', color:'#c7c7cc'}}>Скоро</span>}
+                    {progress && (
+                      <div style={{display:'flex', gap:8}}>
+                        <button onClick={() => startAttestation(b.id, true)}
+                          style={{flex:1, padding:'9px', background:'rgba(0,113,227,0.1)', color:'#0071e3', border:'none', borderRadius:10, fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer'}}>
+                          Продолжить с вопроса {progress.question_number}
+                        </button>
+                        <button onClick={() => startAttestation(b.id, false)}
+                          style={{flex:1, padding:'9px', background:'rgba(0,0,0,0.06)', color:'#86868b', border:'none', borderRadius:10, fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer'}}>
+                          Начать заново
+                        </button>
+                      </div>
+                    )}
+                    {result && !progress && (
+                      <button onClick={() => startAttestation(b.id, false)}
+                        style={{width:'100%', padding:'9px', background:'rgba(0,0,0,0.06)', color:'#86868b', border:'none', borderRadius:10, fontSize:13, fontWeight:600, fontFamily:'inherit', cursor:'pointer'}}>
+                        Пройти заново
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -420,7 +516,7 @@ export default function Home() {
             <button onClick={() => setAttStage('blocks')} style={{width:'100%', padding:'16px', background:'#0071e3', color:'white', border:'none', borderRadius:14, fontSize:16, fontWeight:600, fontFamily:'inherit', cursor:'pointer', marginBottom:10}}>
               Пройти другой блок
             </button>
-            <button onClick={() => startAttestation(attBlock)} style={{width:'100%', padding:'16px', background:'rgba(255,255,255,0.62)', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.78)', borderRadius:14, fontSize:16, fontWeight:600, fontFamily:'inherit', cursor:'pointer', color:'#0071e3'}}>
+            <button onClick={() => startAttestation(attBlock, false)} style={{width:'100%', padding:'16px', background:'rgba(255,255,255,0.62)', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.78)', borderRadius:14, fontSize:16, fontWeight:600, fontFamily:'inherit', cursor:'pointer', color:'#0071e3'}}>
               Пройти этот блок заново
             </button>
           </>
