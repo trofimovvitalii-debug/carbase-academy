@@ -160,11 +160,12 @@ export default function Home() {
     },
   };
 
-  const blocks = [
+const blocks = [
     {id:'ppf', icon:'🛡️', name:'Антигравийная плёнка', meta:'10 вопросов · ~8 мин', color:'rgba(0,113,227,0.12)', active:true},
     {id:'antidust', icon:'💧', name:'Антидождь', meta:'10 вопросов · ~8 мин', color:'rgba(255,149,0,0.12)', active:true},
     {id:'polish', icon:'✨', name:'Полировка кузова и керамика', meta:'10 вопросов · ~8 мин', color:'rgba(52,199,89,0.12)', active:true},
     {id:'cleaning', icon:'🧹', name:'Химчистка', meta:'10 вопросов · ~8 мин', color:'rgba(175,82,222,0.12)', active:true},
+    {id:'price', icon:'💰', name:'Прайс и цены', meta:'10 вопросов · ~8 мин', color:'rgba(52,199,89,0.12)', active:true},
     {id:'sales', icon:'🗣️', name:'Техника продаж', meta:'Скоро — загружаем материалы', color:'rgba(255,59,48,0.12)', active:false},
   ];
 
