@@ -61,11 +61,14 @@ export async function POST(request) {
         max_tokens: 500,
         system: systemPrompt,
         messages: [
-          { role: 'user', content: `Задай вопрос номер ${question_number} из 10. Уже заданные вопросы: ${JSON.stringify(prevQuestions)}` }
+          { role: 'user', content: `Задай вопрос номер ${question_number} из 10. Уже заданные темы: ${prevQuestions.map((q,i) => `${i+1}. ${q.substring(0,50)}`).join('; ')}` }
         ]
       })
     });
     const result = await response.json();
+    if (!result.content || !result.content[0]) {
+      return Response.json({ question: 'Ошибка загрузки вопроса. Нажмите "Следующий вопрос" ещё раз.' });
+    }
     return Response.json({ question: result.content[0].text });
   }
 
@@ -91,13 +94,14 @@ export async function POST(request) {
       })
     });
     const result = await response.json();
+    if (!result.content || !result.content[0]) {
+      return Response.json({ evaluation: 'Ошибка оценки. Попробуйте ещё раз.' });
+    }
     const evaluation = result.content[0].text;
 
-    // Извлекаем балл из текста
     const scoreMatch = evaluation.match(/ОБЩИЙ БАЛЛ:\s*(\d+)/);
     const score = scoreMatch ? scoreMatch[1] : '?';
 
-    // Сохраняем результат если есть user_id
     if (user_id) {
       await supabase
         .from('attestation_results')
