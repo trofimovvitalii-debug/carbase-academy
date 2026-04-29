@@ -3,6 +3,42 @@ import { useState, useRef, useEffect } from 'react';
 
 export default function Home() {
   const [screen, setScreen] = useState('home');
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = '/login';
+        return;
+      }
+      // Проверяем статус
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('status, role, name')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile || profile.status === 'pending') {
+        window.location.href = '/pending';
+        return;
+      }
+      if (profile.status !== 'active') {
+        window.location.href = '/login';
+        return;
+      }
+      setUser({ ...session.user, ...profile });
+      setAuthLoading(false);
+    }
+    checkAuth();
+  }, []);
+
+  if (authLoading) return (
+    <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #dff0ff 0%, #f0f0ff 45%, #ffe8f8 100%)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+      <div style={{fontSize:14, color:'#86868b'}}>Загрузка...</div>
+    </div>
+  );
   const [messages, setMessages] = useState([{role:'assistant',content:'Привет! Я твой помощник по услугам, технологиям, ценам и технике продаж в CarBase. Задай вопрос или опиши ситуацию с клиентом 💪'}]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
